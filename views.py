@@ -1,94 +1,192 @@
-from django.shortcuts import render
+from ast import Delete
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from rest_framework.exceptions import AuthenticationFailed
-from .serializers import BookAppointmentSerializers, PaymentSerializers
-from .models import Appointment
-from rest_framework import status
-import jwt, datetime,json
 import requests
+from rest_framework.exceptions import AuthenticationFailed
+from .serializers import UserSerializer
+from .models import User
+import jwt, datetime
 
 
-class BookAppointment(APIView):
+# Create your views here.
+class RegisterView(APIView):
     def post(self, request):
-        print(request.data['jwt'])
-        data=request.data['jwt']
-        payload = jwt.decode(data, 'secret', algorithms=['HS256'])
-        print(type(payload))
-        serializer = BookAppointmentSerializers(data=payload)
-        print(serializer.is_valid())
-        print(serializer.errors)
-        print('yes')
+        serializer = UserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"msg":"done"})
+        return Response(serializer.data)
+
+
+class LoginView(APIView):
+    def post(self, request):
+        email = request.data['email']
+        password = request.data['password']
+
+        user = User.objects.filter(email=email).first()
+
+        if user is None:
+            raise AuthenticationFailed('User not found!')
+
+        if not user.check_password(password):
+            raise AuthenticationFailed('Incorrect password!')
+
+        payload = {
+            'id': user.id,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60),
+            'iat': datetime.datetime.utcnow()
+        }
+
+        token = jwt.encode(payload, 'secret', algorithm='HS256')
+
+        response = Response()
+
+        response.set_cookie(key='jwt', value=token, httponly=True)
+        response.data = {
+            'jwt': token
+        }
+        return response
+
+
+class UserView(APIView):
     
-class PatientAppointmentDetails(APIView):
-    def get(self,_,pk=None):
-        print(pk)
-        appointments=Appointment.objects.filter(patient_id=pk)
-        serializer=BookAppointmentSerializers(appointments,many=True)
-        return Response(serializer.data)
+    def get(self, request):
+        token = request.COOKIES.get('jwt')
 
-class DoctorAppointmentDetails(APIView):
-    def get(self,_,pk=None):
-        appointments=Appointment.objects.filter(doctor_id=pk)
-        serializer=BookAppointmentSerializers(appointments,many=True)
-        return Response(serializer.data)
+        if not token:
+            raise AuthenticationFailed('Unauthenticated User')
 
-
-class PaymentView(APIView):
-    def post(self,request,format=None,**kwargs):
-        serializer=PaymentSerializers(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            serializer.save()
-            return Response(serializer.data)#status= status.HTTP_201_CREATED)
-        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST) 
+        try:
+            payload = jwt.decode(token, 'secret', algorithms=['HS256'])
+        
+        except jwt.ExpiredSignatureError :
+            raise AuthenticationFailed('Unauthenticated User')
+        
+        #user = User.objects.filter(id = payload['id']).first()
+        #serializer = UserSerializer(user)
+        k = payload['id']
+        r = requests.get('http://127.0.0.1:8004/api/patientappointmentdetails/%d' % k)
+        print('yes')
+        return Response(r.json())
 
 
+class LogoutView(APIView):
+    def post(self, request):
+        response = Response()
+        response.delete_cookie('jwt')
+        response.data = {
+            'message': 'success'
+        }
+        return response
+
+class bookAppointment(APIView):
+    def post(self, request):
+          token = request.COOKIES.get('jwt')
+
+          if not token:
+               raise AuthenticationFailed('Unauthenticated!')
+
+          try:
+               r= jwt.decode(token, 'secret', algorithms=['HS256'])
+       
+          except jwt.ExpiredSignatureError:
+               raise AuthenticationFailed('Unauthenticated!')
+
+          payloadA ={
+            
+            
+            'doctor_id': request.data['doctor_id'],
+            'doctor_name':request.data['doctor_name'],
+            'patient_name':request.data['patient_name'],
+            'patient_id': r['id'],
+            'email':request.data['email'],
+            'phone':request.data['phone'],
+            'address':request.data['address'],
+            'gender':request.data['gender'],
+            'symptoms':request.data['symptoms'],
+            'appointment_slot':request.data['appointment_slot'],
+            'appointment_date':request.data['appointment_date'],
+            'booking_status':request.data['booking_status'],
+        }
+ 
+
+          tokenA=jwt.encode(payloadA,'secret',algorithm='HS256')
+
+          response=Response()
+          response.data={
+            "jwt":tokenA
+          }
+          response=requests.post("http://127.0.0.1:8004/api/appointment",data=response.data)             
+          return Response(response)
+
+     
+
+class modifyAppointment(APIView):
+    def post(self, request):
+          token = request.COOKIES.get('jwt')
+
+          if not token:
+               raise AuthenticationFailed('Unauthenticated!')
+
+          try:
+               r= jwt.decode(token, 'secret', algorithms=['HS256'])
+       
+          except jwt.ExpiredSignatureError:
+               raise AuthenticationFailed('Unauthenticated!')
+
+          payloadB ={
+            
+            'appointment_id': request.data['appointment_id'],
+            'doctor_id': request.data['doctor_id'],
+            'doctor_name':request.data['doctor_name'],
+            'patient_name':request.data['patient_name'],
+            'patient_id': r['id'],
+            'email':request.data['email'],
+            'phone':request.data['phone'],
+            'address':request.data['address'],
+            'gender':request.data['gender'],
+            'symptoms':request.data['symptoms'],
+            'appointment_slot':request.data['appointment_slot'],
+            'appointment_date':request.data['appointment_date'],
+            'booking_status':request.data['booking_status'],
+        }
+ 
+
+          tokenA=jwt.encode(payloadB,'secret',algorithm='HS256')
+
+          response=Response()
+          response.data={
+            "jwt":tokenA
+          }
+          response=requests.put("http://127.0.0.1:8004/api/modifyappointment",data=response.data)             
+          return Response(response)          
 
 
-# class modifyAppointment(APIView):
-#     def post(self, request,pk=None):
-#         print(request.data['jwt'])
-#         data=request.data['jwt']
-#         payload = jwt.decode(data, 'secret', algorithms=['HS256'])
-#         print(type(payload))
-#         appointments=BookAppointment.objects.filter(appointment_id=pk)
-#         serializer = BookAppointmentSerializers(data=payload)
-#         print(serializer.is_valid())
-#         print(serializer.errors)
-#         print('yes')
-#         serializer.save()
-#         return Response({"msg":"modification done"})
+class deleteAppointment(APIView): 
+    def post(self, request):
+          token = request.COOKIES.get('jwt')
 
+          if not token:
+               raise AuthenticationFailed('Unauthenticated!')
 
+          try:
+               r= jwt.decode(token, 'secret', algorithms=['HS256'])
+       
+          except jwt.ExpiredSignatureError:
+               raise AuthenticationFailed('Unauthenticated!')
 
-@api_view(['PUT'])
-def ModifyView(request):
-    if request.method == 'PUT':
-          print(request.data['jwt'])
-          data=request.data['jwt']
-          payload = jwt.decode(data, 'secret', algorithms=['HS256'])
-          print(type(payload))
-          appointment_id=payload['appointment_id']
-          appointment=Appointment.objects.get(id=appointment_id)
-          serializer =BookAppointmentSerializers(appointment,data=payload)
-          print(serializer.is_valid())
-          print(serializer.errors)
-          print('yes')
-          serializer.save()
-          return Response({"msg":"modification done"})   
+          payloadB ={
+            
+            'appointment_id': request.data['appointment_id'],
+            
+        }
+ 
 
+          tokenA=jwt.encode(payloadB,'secret',algorithm='HS256')
 
-@api_view(['DELETE'])
-def DeleteView(request):
-    if request.method == 'DELETE':
-          print(request.data['jwt'])
-          data=request.data['jwt']
-          payload = jwt.decode(data, 'secret', algorithms=['HS256'])
-          print(type(payload))
-          appointment_id=payload['appointment_id']
-          appointment=Appointment.objects.get(id=appointment_id)
-          appointment.delete()
-          return Response({"msg":"deleted"})             
+          response=Response()
+          response.data={
+            "jwt":tokenA
+          }
+          response=requests.delete("http://127.0.0.1:8004/api/deleteappointment",data=response.data)             
+          return Response(response) 

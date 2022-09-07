@@ -1,12 +1,12 @@
 from django.urls import path
-from .views import BookAppointment, PatientAppointmentDetails, DoctorAppointmentDetails, PaymentView,ModifyView , DeleteView
+from .views import RegisterView, LoginView, UserView, LogoutView, bookAppointment, modifyAppointment, deleteAppointment
 
 urlpatterns = [
-    path('appointment', BookAppointment.as_view()),
-    path('patientappointmentdetails/<int:pk>', PatientAppointmentDetails.as_view()),
-    path('doctorappointmentdetails/<int:pk>', DoctorAppointmentDetails.as_view()),
-    path('payment/',PaymentView.as_view(),name='payment'),
-    path('modifyappointment', ModifyView),
-    path('deleteappointment', DeleteView)
+    path('register', RegisterView.as_view()),
+    path('login', LoginView.as_view()),
+    path('user', UserView.as_view()),
+    path('logout', LogoutView.as_view()),
+    path('bookappointment', bookAppointment.as_view()),
+    path('modifyappointment', modifyAppointment.as_view()),
+    path('deleteappointment', deleteAppointment.as_view())
 ]
-
